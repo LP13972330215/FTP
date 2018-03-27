@@ -16,7 +16,7 @@ class EncryptUtil(object):
     @staticmethod
     def __sha1_enc(origin):
         enc_obj = hashlib.sha1()
-        enc_obj.update(origin)
+        enc_obj.update(origin.encode("utf-8"))
         return enc_obj.hexdigest()
 
     @staticmethod

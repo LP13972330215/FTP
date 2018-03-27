@@ -7,6 +7,7 @@ import json
 import os
 import time
 from FTP.server.user.encyption import EncryptUtil
+from FTP.server.user.user_login import UserLogin
 
 
 class MyServer(socketserver.BaseRequestHandler):
@@ -54,14 +55,17 @@ class MyServer(socketserver.BaseRequestHandler):
         cmd_dict = args[0]
         username = cmd_dict["username"]
         password = cmd_dict["password"]
-        password_new = EncryptUtil(password)
-
-
-
+        encrypt_password = EncryptUtil().sha1_salt_enc(password)
+        result = UserLogin().login(username, encrypt_password)
+        if result:
+            self.request.send("ok".encode('utf-8'))
+        else:
+            self.request.send('no'.encode('utf-8'))
 
     def handle(self):
         while True:
             try:
+                print("waiting...")
                 self.data = self.request.recv(1024).strip()
                 print("{} wrote:".format(self.client_address[0]))
                 print(self.data)
@@ -77,7 +81,7 @@ class MyServer(socketserver.BaseRequestHandler):
 
 
 def main():
-    server = socketserver.ThreadingTCPServer(("localhost", 9996), MyServer)
+    server = socketserver.ThreadingTCPServer(("localhost", 9997), MyServer)
     server.serve_forever()
 
 

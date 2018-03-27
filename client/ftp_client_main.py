@@ -7,10 +7,6 @@ import socket
 import os
 import json
 
-client = socket.socket()
-
-client.connect(("0.0.0.0", 9999))
-
 
 class FtpClient(object):
 
@@ -32,17 +28,37 @@ class FtpClient(object):
         """
         print(message)
 
+    def login(self):
+        username = input("enter youname:").strip()
+        password = input("enter passwd:").strip()
+        if not len(username) or not len(password):
+            return
+        cmd = {
+            "action": "authentication",
+            "username": username,
+            "password": password
+        }
+        self.client.send(json.dumps(cmd).encode('utf-8'))
+        server_response = self.client.recv(1024).decode()
+        if server_response != 'ok':
+            print("login failed")
+            return False
+        print("login success")
+        return True
+
     def interactive(self):
-        while True:
-            cmd = input(">>>:").strip()
-            if len(cmd) == 0:
-                    continue
-            cmd_str = cmd.split()[0]
-            if hasattr(self, 'cmd_%s' % cmd_str):
-                func = getattr(self, 'cmd_%s' % cmd_str)
-                func(cmd)
-            else:
-                self.help()
+        login_result = self.login()
+        if login_result:
+            while True:
+                cmd = input(">>>:").strip()
+                if len(cmd) == 0:
+                        continue
+                cmd_str = cmd.split()[0]
+                if hasattr(self, 'cmd_%s' % cmd_str):
+                    func = getattr(self, 'cmd_%s' % cmd_str)
+                    func(cmd)
+                else:
+                    self.help()
 
     def cmd_put(self, *args):
         cmd_split = args[0].split()
@@ -98,5 +114,5 @@ class FtpClient(object):
 
 if __name__ == "__main__":
     ftp = FtpClient()
-    ftp.connect("localhost", 9996)
+    ftp.connect("localhost", 9997)
     ftp.interactive()
