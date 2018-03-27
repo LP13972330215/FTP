@@ -68,8 +68,32 @@ class FtpClient(object):
             else:
                 print(filename, 'is not exits')
 
-    def cmd_get(self):
-        pass
+    def cmd_get(self, *args):
+        cmd_split = args[0].split()
+        if len(cmd_split) > 1:
+            filename = cmd_split[1]
+            if os.path.exists(filename):
+                print("file is exist, will over")
+            msg_dic = {
+                "action": "get",
+                "filename": filename,
+            }
+            self.client.send(json.dumps(msg_dic).encode('utf-8'))
+            server_response = self.client.recv(1024).decode()
+            if server_response == "no":
+                print("%s is not exist" % filename)
+                return
+
+            filesize = json.loads(server_response)['size']
+            filename = json.loads(server_response)['filename']
+            foo = open(filename, 'wb')
+            recv_size = 0
+            while recv_size < filesize:
+                data = self.client.recv(1024)
+                foo.write(data)
+                recv_size += len(data)
+            else:
+                print("file [%s] download success" % filename)
 
 
 if __name__ == "__main__":
