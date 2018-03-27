@@ -50,6 +50,15 @@ class MyServer(socketserver.BaseRequestHandler):
             print('file [%s] download success!!!' % filename)
             foo.close()
 
+    def authentication(self, *args):
+        cmd_dict = args[0]
+        username = cmd_dict["username"]
+        password = cmd_dict["password"]
+        password_new = EncryptUtil(password)
+
+
+
+
     def handle(self):
         while True:
             try:
