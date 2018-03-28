@@ -6,11 +6,14 @@ import socketserver
 import json
 import os
 import time
-from FTP.server.user.encyption import EncryptUtil
-from FTP.server.user.user_login import UserLogin
+from server.user.encyption import EncryptUtil
+from server.user.user import User
 
 
 class MyServer(socketserver.BaseRequestHandler):
+
+    user_basic_path = None
+    user_current_path = None
 
     def put(self, *args):
         cmd_dic = args[0]
@@ -56,11 +59,29 @@ class MyServer(socketserver.BaseRequestHandler):
         username = cmd_dict["username"]
         password = cmd_dict["password"]
         encrypt_password = EncryptUtil().sha1_salt_enc(password)
-        result = UserLogin().login(username, encrypt_password)
+        result, path = User(username, encrypt_password).login()
+
         if result:
             self.request.send("ok".encode('utf-8'))
+            MyServer.user_basic_path = path
+            MyServer.user_current_path = path
         else:
             self.request.send('no'.encode('utf-8'))
+
+    def pwd(self, *args):
+        cmd_dict = args[0]
+        action = cmd_dict["action"]
+        if action == "pwd":
+            print(MyServer.user_current_path)
+            self.request.send(MyServer.user_current_path.encode('utf-8'))
+
+    def ls(self, *args):
+        cmd_dict = args[0]
+        action = cmd_dict["action"]
+        if action == "ls":
+            self.request.send(str(os.listdir(MyServer.user_current_path)).encode('utf-8'))
+
+
 
     def handle(self):
         while True:
@@ -76,8 +97,6 @@ class MyServer(socketserver.BaseRequestHandler):
                     func(cmd_dic)
             except ConnectionResetError as e:
                 print(e)
-            except KeyboardInterrupt as e:
-                print("server close")
 
 
 def main():

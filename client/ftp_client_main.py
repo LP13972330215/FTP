@@ -12,6 +12,7 @@ class FtpClient(object):
 
     def __init__(self):
         self.client = socket.socket()
+        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.total_size = 0
         self.send_size = 0
 
@@ -59,6 +60,14 @@ class FtpClient(object):
                     func(cmd)
                 else:
                     self.help()
+
+    def cmd_ls(self, *args):
+        msg_dic = {
+                "action": "ls"
+            }
+        self.client.send(str(json.dumps(msg_dic)).encode('utf-8'))
+        server_response = self.client.recv(1024).decode()
+        print("ls :\n", server_response)
 
     def cmd_put(self, *args):
         cmd_split = args[0].split()
@@ -110,6 +119,14 @@ class FtpClient(object):
                 recv_size += len(data)
             else:
                 print("file [%s] download success" % filename)
+
+    def cmd_pwd(self):
+            msg_dic = {
+                "action": "pwd",
+            }
+            self.client.send(json.dumps(msg_dic).encode('utf-8'))
+            server_response = self.client.recv(1024).decode()
+            print("pwd:/n", server_response)
 
 
 if __name__ == "__main__":
