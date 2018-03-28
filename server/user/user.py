@@ -45,25 +45,10 @@ class User(object):
 
     @staticmethod
     def count_disk_size(username):
-        total_size = 0
-        print(123)
-        # user_path = CONFIG_PATH + '/' + username
-        for i , j ,k in os.walk(username):
-            for x in k:
-                total_size += os.stat(x).st_size
-
-        return total_size
-
-def FileSize(path):
-    size = 0
-    for root , dirs, files in os.walk(path, True):
-
-        size += sum([os.stat(os.path.join(root, name)).st_size for name in files])
-    #目录下文件大小累加
-    return size
-print(FileSize("/home/pliu/study/51CTO/FTP/client/"))
-
-
-
-
-
+        size = 0
+        path = FILE_PATH + '/' + username
+        for root, dirs, files in os.walk(path, True):
+            for file in files:
+                print(file, os.stat(os.path.join(root, file)).st_size)
+                size += os.stat(os.path.join(root, file)).st_size
+        return size
