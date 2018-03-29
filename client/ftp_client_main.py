@@ -47,6 +47,21 @@ class FtpClient(object):
         print("login success")
         return True
 
+    def cmd_cd(self, *args):
+        cmd_split = args[0].split()
+        if len(cmd_split) > 1:
+            seat = cmd_split[1].strip()
+            msg_dic = {
+                "action": "cd",
+                "seat": seat
+            }
+            self.client.send(json.dumps(msg_dic).encode('utf-8'))
+            server_response = self.client.recv(1024).decode()
+            if server_response == 'no':
+                print("insufficient privilege")
+                return
+            print("you enter to:%s" % server_response)
+
     def interactive(self):
         login_result = self.login()
         if login_result:
@@ -120,16 +135,16 @@ class FtpClient(object):
             else:
                 print("file [%s] download success" % filename)
 
-    def cmd_pwd(self):
+    def cmd_pwd(self, *args):
             msg_dic = {
                 "action": "pwd",
             }
             self.client.send(json.dumps(msg_dic).encode('utf-8'))
             server_response = self.client.recv(1024).decode()
-            print("pwd:/n", server_response)
+            print("pwd:", server_response)
 
 
 if __name__ == "__main__":
     ftp = FtpClient()
-    ftp.connect("localhost", 9997)
+    ftp.connect("localhost", 9998)
     ftp.interactive()
