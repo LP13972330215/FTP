@@ -60,6 +60,9 @@ class FtpClient(object):
             if server_response == 'no':
                 print("insufficient privilege")
                 return
+            if server_response == "error path":
+                print("target path is error")
+                return
             print("you enter to:%s" % server_response)
 
     def interactive(self):
@@ -146,5 +149,5 @@ class FtpClient(object):
 
 if __name__ == "__main__":
     ftp = FtpClient()
-    ftp.connect("localhost", 9998)
+    ftp.connect("localhost", 9996)
     ftp.interactive()

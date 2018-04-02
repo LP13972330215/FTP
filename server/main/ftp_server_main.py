@@ -84,29 +84,32 @@ class MyServer(socketserver.BaseRequestHandler):
 
     def cd(self, *args):
         result = False
+        print (args)
         cmd_dict = args[0]
+
         action = cmd_dict["action"]
         cd_seat = cmd_dict["seat"].strip()
+        print ("dangqian mujing:", MyServer.user_current_path)
+        print("jiben lujing:", MyServer.user_basic_path)
+
         if action == 'cd':
             if cd_seat == '/':
                 print(MyServer.user_current_path, MyServer.user_basic_path)
                 MyServer.user_current_path = MyServer.user_basic_path
                 result = True
-            if cd_seat == '..':
-                res = os.path.dirname(MyServer.user_current_path)
-                if res == MyServer.user_current_path:
+            elif cd_seat == '..':
+                if MyServer.user_basic_path == MyServer.user_current_path:
                     self.request.send("no".encode('utf-8'))
                     return
-                MyServer.user_current_path = res
+                MyServer.user_current_path = '/'.join(MyServer.user_current_path.split('/')[0:-1])
                 result = True
-            if os.path.exists(MyServer.user_current_path + '/' + cd_seat):
+            elif os.path.exists(MyServer.user_current_path + '/' + cd_seat):
                 MyServer.user_current_path = MyServer.user_current_path + '/' + cd_seat
                 result = True
             if result:
                 self.request.send(str(MyServer.user_current_path).encode('utf-8'))
             else:
-                self.request.send("no".encode('utf-8'))
-
+                self.request.send("error path".encode('utf-8'))
 
     def handle(self):
         while True:
@@ -125,7 +128,7 @@ class MyServer(socketserver.BaseRequestHandler):
 
 
 def main():
-    server = socketserver.ThreadingTCPServer(("localhost", 9998), MyServer)
+    server = socketserver.ThreadingTCPServer(("localhost", 9996), MyServer)
     server.serve_forever()
 
 
