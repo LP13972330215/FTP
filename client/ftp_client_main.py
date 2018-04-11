@@ -1,153 +1,194 @@
-#!usr/bin/env python
-# -*- coding: utf-8 -*-
-
-__author__ = 'pliu'
+#!/usr/bin/env python
+# -*- coding:utf-8 -*-
 
 import socket
 import os
+import sys
 import json
+from server.user.encyption import EncryptUtil
 
 
-class FtpClient(object):
-
+class Ftpclient(object):
     def __init__(self):
         self.client = socket.socket()
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.total_size = 0
-        self.send_size = 0
 
     def connect(self, ip, port):
         self.client.connect((ip, port))
 
-    def help(self):
-        message = """
-        ls
-        pwd
-        cd ..
-        put filename
-        get filename
-        """
-        print(message)
-
-    def login(self):
-        username = input("enter youname:").strip()
-        password = input("enter passwd:").strip()
-        if not len(username) or not len(password):
-            return
-        cmd = {
-            "action": "authentication",
-            "username": username,
-            "password": password
-        }
-        self.client.send(json.dumps(cmd).encode('utf-8'))
-        server_response = self.client.recv(1024).decode()
-        if server_response != 'ok':
-            print("login failed")
-            return False
-        print("login success")
-        return True
-
-    def cmd_cd(self, *args):
-        cmd_split = args[0].split()
-        if len(cmd_split) > 1:
-            seat = cmd_split[1].strip()
-            msg_dic = {
-                "action": "cd",
-                "seat": seat
+    def main(self):
+        while True:
+            username = input("输入用户名：").strip()
+            password = input("输入密码：").strip()
+            enc_password = EncryptUtil(password)
+            login_info = {
+                "action": "login",
+                "username": username,
+                "password": enc_password
             }
-            self.client.send(json.dumps(msg_dic).encode('utf-8'))
-            server_response = self.client.recv(1024).decode()
-            if server_response == 'no':
-                print("insufficient privilege")
-                return
-            if server_response == "error path":
-                print("target path is error")
-                return
-            print("you enter to:%s" % server_response)
+
+            self.client.sendall(json.dumps(login_info).encode())
+            status_code = self.client.recv(1024).decode()
+            if status_code == "400":
+                print("[%s]用户密码认证错误" % status_code)
+                continue
+            else:
+                print("[%s]用户密码认证成功" % status_code)
+            self.interactive()
 
     def interactive(self):
-        login_result = self.login()
-        if login_result:
-            while True:
-                cmd = input(">>>:").strip()
-                if len(cmd) == 0:
-                        continue
-                cmd_str = cmd.split()[0]
-                if hasattr(self, 'cmd_%s' % cmd_str):
-                    func = getattr(self, 'cmd_%s' % cmd_str)
-                    func(cmd)
-                else:
-                    self.help()
+        while True:
+            command = input(">>").strip()
+            if not command:
+                continue
+            command = command.split()[0]
+            if hasattr(self, command):           # 执行命令
+                func = getattr(self, command)
+                func(command)
+            else:
+                print("[%s]命令不存在" % 401)
 
-    def cmd_ls(self, *args):
-        msg_dic = {
-                "action": "ls"
-            }
-        self.client.send(str(json.dumps(msg_dic)).encode('utf-8'))
-        server_response = self.client.recv(1024).decode()
-        print("ls :\n", server_response)
+    def get(self,command):
+        '''下载文件'''
+        self.client.sendall(command.encode())  #发送要执行的命令
+        status_code = self.client.recv(1024).decode()
+        if status_code == "201":            #命令可执行
+            filename = command.split()[1]
 
-    def cmd_put(self, *args):
-        cmd_split = args[0].split()
-        if len(cmd_split) > 1:
-            filename = cmd_split[1]
+            # 文件名存在，判断是否续传
             if os.path.isfile(filename):
-                filesize = os.stat(filename).st_size
-                msg_dic = {
-                    "action": "put",
-                    "filename": filename,
-                    "size": filesize,
-                    "overridden": True,
-                }
-                self.client.send(json.dumps(msg_dic).encode('utf-8'))
-                server_response = self.client.recv(1024).decode()
-                if server_response == 'ok':
-                    foo = open(filename, 'rb')
-                    for line in foo:
-                        self.client.send(line)
+                revice_size = os.stat(filename).st_size     #文件已接收大小
+                self.client.sendall("403".encode())
+                response = self.client.recv(1024)
+                self.client.sendall(str(revice_size).encode())   #发送已接收文件大小
+                status_code = self.client.recv(1024).decode()
+
+                # 文件大小不一致，续传
+                if status_code == "205":
+                    print("继续上次上传位置进行续传")
+                    self.client.sendall("000".encode())
+
+                # 文件大小一致，不续传,不下载
+                elif status_code == "405":
+                    print("文件已经存在，大小一致")
+                    return
+
+            # 文件不存在
+            else:
+                self.client.sendall("402".encode())
+                revice_size = 0
+
+            file_size = self.client.recv(1024).decode() #文件大小
+            file_size = int(file_size)
+            self.client.sendall("000".encode())
+
+            with open(filename,"ab") as file:      #开始接收
+                #file_size 为文件总大小
+                file_size +=revice_size
+                m = hashlib.md5()
+                while revice_size < file_size:
+                    minus_size = file_size - revice_size
+                    if minus_size > 1024:
+                        size = 1024
                     else:
-                        print('file upload success!!!')
-                        foo.close()
+                        size = minus_size
+                    data = self.client.recv(size)
+                    revice_size += len(data)
+                    file.write(data)
+                    m.update(data)
+                    self.__progress(revice_size,file_size,"下载中")      #进度条
+                new_file_md5 = m.hexdigest()        #生成新文件的md5值
+                server_file_md5 = self.client.recv(1024).decode()
+                if new_file_md5 == server_file_md5:     #md5值一致
+                    print("\n文件具有一致性")
+        else:print("[%s] Error！"%(status_code))
+
+    def put(self,command):
+        '''上传文件'''
+        if len(command.split()) > 1:
+            filename = command.split()[1]
+            #file_path = self.current_path + r"\%s"%filename
+            if os.path.isfile(filename):               #文件是否存在
+                self.client.sendall(command.encode())  #发送要执行的命令
+                response = self.client.recv(1024)      #收到ack确认
+
+                file_size = os.stat(filename).st_size  # 文件大小
+                self.client.sendall(str(file_size).encode())  # 发送文件大小
+                status_code = self.client.recv(1024).decode()  # 等待响应,返回状态码
+                if status_code == "202":
+                    with open(filename,"rb") as file:
+                        m = hashlib.md5()
+                        for line in file:
+                            m.update(line)
+                            send_size = file.tell()
+                            self.client.sendall(line)
+                            self.__progress(send_size, file_size, "上传中")  # 进度条
+                    self.client.sendall(m.hexdigest().encode())     #发送文件md5值
+                    status_code = self.client.recv(1024).decode()  #返回状态码
+                    if status_code == "203":
+                        print("\n文件具有一致性")
+                else:print("[%s] Error！"%(status_code))
             else:
-                print(filename, 'is not exits')
+                print("[402] Error")
+        else: print("[401] Error")
 
-    def cmd_get(self, *args):
-        cmd_split = args[0].split()
-        if len(cmd_split) > 1:
-            filename = cmd_split[1]
-            if os.path.exists(filename):
-                print("file is exist, will over")
-            msg_dic = {
-                "action": "get",
-                "filename": filename,
-            }
-            self.client.send(json.dumps(msg_dic).encode('utf-8'))
-            server_response = self.client.recv(1024).decode()
-            if server_response == "no":
-                print("%s is not exist" % filename)
-                return
+    def dir(self,command):
+        '''查看当前目录下的文件'''
+        self.__universal_method_data(command)
+        pass
 
-            filesize = json.loads(server_response)['size']
-            filename = json.loads(server_response)['filename']
-            foo = open(filename, 'wb')
-            recv_size = 0
-            while recv_size < filesize:
-                data = self.client.recv(1024)
-                foo.write(data)
-                recv_size += len(data)
-            else:
-                print("file [%s] download success" % filename)
+    def pwd(self,command):
+        '''查看当前用户路径'''
+        self.__universal_method_data(command)
+        pass
 
-    def cmd_pwd(self, *args):
-            msg_dic = {
-                "action": "pwd",
-            }
-            self.client.send(json.dumps(msg_dic).encode('utf-8'))
-            server_response = self.client.recv(1024).decode()
-            print("pwd:", server_response)
+    def mkdir(self,command):
+        '''创建目录'''
+        self.__universal_method_none(command)
+        pass
+
+    def cd(self,command):
+        '''切换目录'''
+        self.__universal_method_none(command)
+        pass
+
+    def __progress(self, trans_size, file_size,mode):
+        '''
+        显示进度条
+        trans_size: 已经传输的数据大小
+        file_size: 文件的总大小
+        mode: 模式
+        '''
+        bar_length = 100    #进度条长度
+        percent = float(trans_size) / float(file_size)
+        hashes = '=' * int(percent * bar_length)    #进度条显示的数量长度百分比
+        spaces = ' ' * (bar_length - len(hashes))    #定义空格的数量=总长度-显示长度
+        sys.stdout.write(
+            "\r%s:%.2fM/%.2fM %d%% [%s]"%(mode,trans_size/1048576,file_size/1048576,percent*100,hashes+spaces))
+        sys.stdout.flush()
+
+    def __universal_method_none(self,command):
+        '''通用方法，无data输出'''
+        self.client.sendall(command.encode())  # 发送要执行的命令
+        status_code = self.client.recv(1024).decode()
+        if status_code == "201":  # 命令可执行
+            self.client.sendall("000".encode())  # 系统交互
+        else:
+            print("[%s] Error！" % (status_code))
+
+    def __universal_method_data(self,command):
+        '''通用方法，有data输出'''
+        self.client.sendall(command.encode())   #发送要执行的命令
+        status_code = self.client.recv(1024).decode()
+        if status_code == "201":    #命令可执行
+            self.client.sendall("000".encode())      #系统交互
+            data = self.client.recv(1024).decode()
+            print(data)
+        else:
+            print("[%s] Error！" % (status_code))
 
 
 if __name__ == "__main__":
-    ftp = FtpClient()
+    ftp = Ftpclient()
     ftp.connect("localhost", 9996)
     ftp.interactive()

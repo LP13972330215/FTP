@@ -1,36 +1,28 @@
 from server.config.path import CONFIG_PATH
 from server.config.path import FILE_PATH
+from server.config.setting import USER_INFO
 import json
 import os
 
 
-class User(object):
-    def __init__(self, username, password):
+class User_operation(object):
+    def authentication(self, login_info):
+        login_name = login_info['username']
+        login_passwd = login_info["password"]
+        result = False
+        if os.path.isfile(USER_INFO):
+            user_database = self.cat_database(USER_INFO)
+            for user in user_database:
+                if login_name == user["username"]:
+                    if login_passwd == user["password"]:
+                        result = True
+                        return result
+        return result
 
-        self.username = str(username)
-        self.password = password
-
-    def login(self):
-        login_result = False
-        with open(CONFIG_PATH, 'r') as foo:
-            res = json.loads(foo.read())
-        for i in res:
-            config_user = i["username"]
-            config_passwd = i["password"]
-            if config_user == self.username:
-                if config_passwd == self.password:
-                    print("login ok!!!")
-                    login_result = True
-                    file_path = self.create_file_path()
-                    return login_result, file_path
-        return login_result, None
-
-    def create_file_path(self):
-        user_path = FILE_PATH  + self.username
-        if os.path.exists(user_path):
-            return user_path
-        os.mkdir(user_path)
-        return user_path
+    def cat_database(self, DB_FILE):
+        with open(DB_FILE, "r") as file:
+            data = json.loads(file.read())
+            return data
 
     @staticmethod
     def get_disk_size(username):
