@@ -23,10 +23,9 @@ class Myserver(socketserver.BaseRequestHandler):
                 self.conn.sendall(status_code.encode())
                 if status_code == "400":
                     continue
-                self.user_db = result[1]             #当前登录用户信息
-                self.current_path = self.user_db["homepath"]    #用户当前目录
-                self.home_path = self.user_db["homepath"]  #用户宿主目录
-
+                self.user_db = result[1]          #当前登录用户信息
+                self.current_path = setting.DATABASE + '/' + self.user_db["username"]    #用户当前目录
+                self.home_path = setting.DATABASE + self.user_db["homepath"]  #用户宿主目录
                 while True:
                     command = self.conn.recv(1024).decode()
                     command_str = command.split()[0]
@@ -42,10 +41,10 @@ class Myserver(socketserver.BaseRequestHandler):
         '''认证用户'''
         auth = User_operation()      # 创建认证实例
         result = auth.authentication(login_info)         # 认证用户
-        if result:
-            return "200", result
+        if result[0]:
+            return "200", result[1]
         else:
-            return "400", result
+            return "400", result[1]
 
     def get(self,command):
         '''下载文件'''
@@ -96,7 +95,7 @@ class Myserver(socketserver.BaseRequestHandler):
         file_size = self.conn.recv(1024).decode()  # 文件大小
         file_size = int(file_size)
         limit_size = self.user_db["limitsize"]      #磁盘额度
-        used_size = self.__getdirsize(self.home_path)   #已用空间大小
+        used_size = (self.home_path)   #已用空间大小
         if limit_size >= file_size+used_size:
             self.conn.sendall("202".encode())
             with open(file_path, "wb") as file:  # 开始接收
@@ -176,47 +175,8 @@ class Myserver(socketserver.BaseRequestHandler):
         return size
 
 
-
-def create_db():
-    '''创建用户数据库文件'''
-    user_database={}
-    encryption = auth_user.User_operation()
-    limitsize = settings.LIMIT_SIZE
-    for k,v in settings.USERS_PWD.items():
-        username = k
-        password = encryption.hash(v)
-        user_db_path  = settings.DATABASE + r"\%s.db"%username
-        user_home_path = settings.HOME_PATH + r"\%s"%username
-        user_database["username"] = username
-        user_database["password"] = password
-        user_database["limitsize"] = limitsize
-        user_database["homepath"] = user_home_path
-        if not os.path.isfile(user_db_path):
-            with open(user_db_path,"w") as file:
-                file.write(json.dumps(user_database))
-
-def create_dir():
-    '''创建用户属主目录'''
-    for username in settings.USERS_PWD:
-        user_home_path = settings.HOME_PATH + r"\%s" %username
-        if not os.path.isdir(user_home_path):
-            os.popen("mkdir %s" %user_home_path)
-
-
-
-if __name__ == "__main__":
-    '''初始化系统数据并启动程序'''
-    create_db()         #创建数据库
-    create_dir()        #创建属主目录
-                        #启动ftp服务
-    server = sokect_server.socketserver.ThreadingTCPServer(settings.IP_PORT, sokect_server.Myserver)
-    server.serve_forever()
-
-
 def main():
-    create_db()  # 创建数据库
-    create_dir()
-    server = socketserver.ThreadingTCPServer(("localhost", 9996), MyServer)
+    server = socketserver.ThreadingTCPServer(("localhost", 9996), Myserver)
     server.serve_forever()
 
 
