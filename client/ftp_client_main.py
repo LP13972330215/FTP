@@ -6,6 +6,7 @@ import os
 import sys
 import json
 from server.user.encyption import EncryptUtil
+from server.user.user import User_operation
 
 
 class Ftpclient(object):
@@ -17,24 +18,57 @@ class Ftpclient(object):
         self.client.connect((ip, port))
 
     def main(self):
-        while True:
-            username = input("输入用户名：").strip()
-            password = input("输入密码：").strip()
-            enc_password = EncryptUtil(password)
-            login_info = {
-                "action": "login",
-                "username": username,
-                "password": enc_password
-            }
+        quit_flag = False
+        try:
+            while True:
+                print('''
+                    1 login
+                    2 regist
+                    3 quit
+                    '''
+                      )
+                option = input("please input you option:").strip()
+                if option == "1":
+                    username = input("输入用户名：").strip()
+                    password = input("输入密码：").strip()
+                    enc_password = EncryptUtil.sha1_salt_enc(password)
+                    login_info = {
+                        "action": "login",
+                        "username": username,
+                        "password": enc_password
+                    }
 
-            self.client.sendall(json.dumps(login_info).encode())
-            status_code = self.client.recv(1024).decode()
-            if status_code == "400":
-                print("[%s]用户密码认证错误" % status_code)
-                continue
-            else:
-                print("[%s]用户密码认证成功" % status_code)
-            self.interactive()
+                    self.client.sendall(json.dumps(login_info).encode())
+                    status_code = self.client.recv(1024).decode()
+                    if status_code == "400":
+                        print("[%s]用户密码认证错误" % status_code)
+                        continue
+                    else:
+                        print("[%s]用户密码认证成功" % status_code)
+                    self.interactive()
+                elif option == "2":
+                    username = input("输入用户名：").strip()
+                    password = input("输入密码：").strip()
+                    password_ = input("再次输入密码：").strip()
+                    if User_operation().check_user_is_exist(username):
+                        print("username is exist")
+                        continue
+                    if password != password_:
+                        print("please enter the same password")
+                    msg_to_server = {
+                        'action': 'regist',
+                        'username': username,
+                        'password': password
+                    }
+                    self.client.sendall(msg_to_server)
+                elif option == "3":
+                    print("baibai !!!")
+                    break
+                else:
+                    print("input option is error")
+                    continue
+        except Exception as e:
+            print(e)
 
     def interactive(self):
         while True:
@@ -190,5 +224,5 @@ class Ftpclient(object):
 
 if __name__ == "__main__":
     ftp = Ftpclient()
-    ftp.connect("localhost", 9996)
-    ftp.interactive()
+    ftp.connect("localhost", 9999)
+    ftp.main()

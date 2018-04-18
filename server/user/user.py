@@ -1,6 +1,7 @@
 from server.config.path import CONFIG_PATH
 from server.config.path import FILE_PATH
 from server.config.setting import USER_INFO
+from server.config.setting import HOME_PATH
 import json
 import os
 
@@ -16,13 +17,25 @@ class User_operation(object):
                 if login_name == user["username"]:
                     if login_passwd == user["password"]:
                         result = True
-                        return result
-        return result
+                        return result, HOME_PATH + '/' + login_name
+        return result, None
 
     def cat_database(self, DB_FILE):
         with open(DB_FILE, "r") as file:
             data = json.loads(file.read())
             return data
+
+    def check_user_is_exist(self, username):
+        exit_user = []
+        if os.path.isfile(USER_INFO):
+            user_database = self.cat_database(USER_INFO)
+            for line in user_database:
+                exit_user.append(line['username'])
+            if username in exit_user:
+                return False
+            else:
+                return True
+
 
     @staticmethod
     def get_disk_size(username):

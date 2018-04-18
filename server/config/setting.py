@@ -12,7 +12,5 @@ HOME_PATH = os.path.join(BASE_DIR, "home")
 
 USER_INFO = os.path.join(BASE_DIR, "config", "config.json")
 
-with open(USER_INFO, "r") as foo:
-    a = json.loads(foo.read())
-    print(a,type(a))
+
 
